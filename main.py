@@ -1,6 +1,7 @@
 # 프로그램 시작점, REPL 실행
 
 from mini_git import MiniGit
+import shlex
 
 def run_cli():
     git = MiniGit()
@@ -15,7 +16,12 @@ def run_cli():
         if not command.strip():
             continue
 
-        parts = command.split(maxsplit=1)
+        try:
+            parts = shlex.split(command)
+        except ValueError:
+            print("Invalid args")
+            continue
+
         cmd = parts[0].upper()
 
         if cmd in ("EXIT", "QUIT"):
@@ -24,7 +30,7 @@ def run_cli():
         try:
             if cmd == "INIT":
                 if len(parts) != 2:
-                    print("Invalied args")
+                    print("Invalid args")
                     continue
                 git.init(parts[1])
                 print("Initialized repository")
@@ -50,12 +56,6 @@ def run_cli():
                     print("Invalid args")
                     continue
                 message = parts[1].strip()
-                if (
-                    len(message) >= 2
-                    and message[0] == '"'
-                    and message[-1] == '"'
-                ):
-                    message = message[1:-1]
                 commit = git.commit(message)
                 print(f"Committed {commit.hash}")
 
@@ -79,14 +79,10 @@ def run_cli():
                         f"{commit.message}"
                     )
             elif cmd == "PATH":
-                if len(parts) != 2:
+                if len(parts) != 3:
                     print("Invalid args")
                     continue
-                args = parts[1].split()
-                if len(args) != 2:
-                    print("Invalid args")
-                    continue
-                result = git.path(args[0], args[1])
+                result = git.path(parts[1], parts[2])
 
                 if result is None:
                     print("No path")
