@@ -11,33 +11,23 @@ class Graph:
 # ANCESTORS
 # ------------------------
 
-    def ancestors(self, commit_hash):
-        commit = self.repository.get_commit(commit_hash)
-        result = []
-        visited = set()
 
-        visited.add(commit_hash)
-        self._dfs(commit, result, visited)
-        return result
+    def _dfs(self,start_hash, get_neighbors_fn, visited=None):
+        """공통 DFS 순회 유틸"""
+        if visited is None:
+            visited = set()
+        visited.add(start_hash)
+        nodes = []
 
-    def _dfs(self, commit, result, visited):
-        for parent_hash in commit.parents:
-            if parent_hash in visited:
-                continue
+        for neighbor in get_neighbors_fn(start_hash):
+            if neighbor not in visited:
+                nodes.append(neighbor)
+                nodes.extend(self._dfs(neighbor, get_neighbors_fn, visited))
 
-            visited.add(parent_hash)
-            parent = self.repository.get_commit(parent_hash)
-            result.append(parent) # 해시 문자열만 필요하다면 parent.hash로 변경
-            self._dfs(parent, result, visited)
+        return nodes
 
-# ------------------------
-# PATH
-# ------------------------
-
-    def path(self, start_hash, target_hash):
-        self.repository.get_commit(start_hash)
-        self.repository.get_commit(target_hash)
-
+    def _bfs_path(self, start_hash, target_hash, get_neighbors_fn):
+        """공통 BFS 최단 경로 탐색 유틸"""
         if start_hash == target_hash:
             return [start_hash]
 
@@ -48,20 +38,44 @@ class Graph:
             current_path = queue.pop(0)
             current_hash = current_path[-1]
 
-            for neighbor_hash in self._get_neighbors(current_hash):
+            for neighbor_hash in get_neighbors_fn(current_hash):
                 if neighbor_hash in visited:
                     continue
-
                 new_path = current_path + [neighbor_hash]
                 if neighbor_hash == target_hash:
                     return new_path
 
                 visited.add(neighbor_hash)
                 queue.append(new_path)
-
         return None
 
+    def _topological_sort(self):
+        """공통 위상 정렬 유틸 (Kahn's Algorithm)"""
+        commits = list(self.repository.commits.values())
+        parent_count = {commit.hash: len(commit.parents) for commit in commits}
+
+        queue = [commit.hash for commit in commits if parent_count[commit.hash] == 0]
+        result_hashes = []
+
+        while queue:
+            current_hash = queue.pop(0)
+            result_hashes.append(current_hash)
+
+            for child_hash, child_commit in self.repository.commits.items():
+                if current_hash in child_commit.parents:
+                    parent_count[child_hash] -= 1
+                    if parent_count[child_hash] == 0 and child_hash not in queue:
+                        queue.append(child_hash)
+
+        return result_hashes
+    
+    def _get_parents(self, commit_hash):
+        """부모 노드 탐색 헬퍼"""
+        commit = self.repository.get_commit(commit_hash)
+        return commit.parents
+
     def _get_neighbors(self, commit_hash):
+        """부모 및 자식 노드 탐색 헬퍼 (정렬 포함)"""
         raw_neighbors = []
         commit = self.repository.get_commit(commit_hash)
 
@@ -79,39 +93,23 @@ class Graph:
         neighbors = self.sorter.insertion_sort(raw_neighbors, key=lambda x: x)
         return neighbors
 
-# ------------------------
-# LOG
-# ------------------------
+# ========================
+# Public methods .. 
+# ========================
+
+    def ancestors(self, commit_hash):
+        """커밋의 모든 조상 커밋을 반환"""
+        self.repository.get_commit(commit_hash)
+        parent_hashes = self._dfs(commit_hash, self._get_parents)
+        return [self.repository.get_commit(h) for h in parent_hashes]
+
+    def path(self, start_hash, target_hash):
+        """두 커밋 사이의 무방향 최단 경로를 반환"""
+        self.repository.get_commit(start_hash)
+        self.repository.get_commit(target_hash)
+        return self._bfs_path(start_hash, target_hash, self._get_neighbors)
 
     def log(self):
-        commits = list(self.repository.commits.values())
-        child_count = {}
-
-        # 남은 자식 수 카운트
-        for commit in commits:
-            child_count[commit.hash] = 0
-        for commit in commits:
-            for parent_hash in commit.parents:
-                child_count[parent_hash] += 1
-
-        # 자식이 없는 최신 커밋부터 큐에 진입
-        queue = []
-        for commit in commits:
-            if child_count[commit.hash] == 0:
-                queue.append(commit.hash)
-
-        result = []
-
-        while queue:
-            current_hash = queue.pop(0)
-            current_commit = self.repository.get_commit(current_hash)
-            result.append(current_commit)
-
-            # 현재 커밋의 부모 처리
-            for parent_hash in current_commit.parents:
-                child_count[parent_hash] -= 1
-
-                if child_count[parent_hash] == 0 and parent_hash not in queue:
-                    queue.append(parent_hash)
-
-        return result
+        """부모 커밋이 먼저 나오도록 커밋 로그를 반환"""
+        ordered_hashes = self._topological_sort()
+        return [self.repository.get_commit(h) for h in ordered_hashes]
