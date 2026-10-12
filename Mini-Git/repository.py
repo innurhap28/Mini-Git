@@ -35,6 +35,10 @@ class Repository:
     def get_current_branch(self):
         return self.head
 
+    def get_branches_for_commit(self, commit_hash):
+        commit = self.get_commit(commit_hash)
+        return [commit.branch]
+
     def get_current_commit(self):
         commit_hash = self.branches[self.head].commit_hash
         if commit_hash is None:
@@ -65,7 +69,7 @@ class Repository:
 
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        new_commit = Commit(commit_hash, message, self.current_user, timestamp, parents)
+        new_commit = Commit(commit_hash, message, self.current_user, timestamp, parents, self.head)
         self.commits[commit_hash] = new_commit
         self.branches[self.head].commit_hash = commit_hash
 

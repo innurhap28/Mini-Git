@@ -3,6 +3,12 @@
 from mini_git import MiniGit
 import shlex
 
+def check_args(parts, expected):
+    if len(parts) != expected:
+        print("Invalid args")
+        return False
+    return True
+
 def run_cli():
     git = MiniGit()
 
@@ -29,31 +35,27 @@ def run_cli():
 
         try:
             if cmd == "INIT":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 git.init(parts[1])
                 print("Initialized repository")
 
             elif cmd == "BRANCH":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 branch_name = parts[1].strip()
                 git.branch(branch_name)
                 print(f"Created branch '{branch_name}'.")
 
             elif cmd == "SWITCH":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 branch_name = parts[1].strip()
                 git.switch(branch_name)
                 print(f"Switched to branch '{branch_name}'.")
 
             elif cmd == "COMMIT":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 message = parts[1].strip()
                 commit = git.commit(message)
@@ -72,15 +74,17 @@ def run_cli():
                         print("Invalid args")
                         continue
                 for commit in commits:
+                    branches = git.repository.get_branches_for_commit(commit.hash)
+                    branch_info = f" [{', '.join(branches)}]" if branches else ""
                     print(
                         f"{commit.hash} "
                         f"{commit.author} "
                         f"{commit.timestamp} "
                         f"{commit.message}"
+                        f"{branch_info}"
                     )
             elif cmd == "PATH":
-                if len(parts) != 3:
-                    print("Invalid args")
+                if not check_args(parts, 3):
                     continue
                 result = git.path(parts[1], parts[2])
 
@@ -90,16 +94,14 @@ def run_cli():
                     print("->".join(result))
 
             elif cmd == "ANCESTORS":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 commits = git.ancestors(parts[1])
                 for commit in commits:
                     print(commit.hash)
 
             elif cmd == "SEARCH":
-                if len(parts) != 2:
-                    print("Invalid args")
+                if not check_args(parts, 2):
                     continue
                 argument = parts[1]
 
